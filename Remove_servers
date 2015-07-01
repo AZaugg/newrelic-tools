@@ -1,0 +1,67 @@
+#!/usr/bin/python
+#
+# Remove servers that are no longer reporting in
+#
+
+import requests
+
+NEWRELIC_API_KEY = ""
+
+#-------------------------------------------------------------------------------------
+def newrelic_get_servers(page_id, servers=[]):
+    '''
+    Recursive function, hit Servers:List API endpoint and retrieve lists of servers
+    keep listing pages until we no longer have any results to display
+
+    :param page_id: int  - page id to display on API
+    :param servers: list - list containing tupple of
+                           (servername, reporting status)
+    :return: list - Returns a list of tuples
+    '''
+    url = 'https://api.newrelic.com/v2/servers.json'
+    headers = {'X-Api-Key': NEWRELIC_API_KEY}
+    payload = {'page': page_id}
+
+    request = requests.get(url, params=payload, headers=headers)
+    if request.status_code != 200:
+        print "Did not receive 200 response, retrying page %d" % page_id
+        newrelic_get_servers(page_id)
+
+    # If nothing in return object, we are done
+    response = request.json()["servers"]
+    if not response:
+        return servers
+
+    page_id = page_id + 1
+    for server in response:
+        name = server["id"]
+        status = server["reporting"]
+
+        servers.append((name, status))
+
+    return newrelic_get_servers(page_id, servers)
+#-------------------------------------------------------------------------------------
+def newrelic_delete_servers(servers):
+    '''
+    Takes a list and removes all servers in the list in newrelic
+
+    :param servers: list - list of server IDs
+    '''
+    for server in servers:
+        url = "https://api.newrelic.com/v2/servers/%d.json" % server
+        headers = {'X-Api-Key': NEWRELIC_API_KEY}
+
+        request = requests.delete(url, headers=headers)
+
+#-------------------------------------------------------------------------------------
+if __name__ == "__main__":
+
+    if not NEWRELIC_API_KEY:
+        print "No newrelic API key set"
+        exit(1)
+
+    page_id = 1
+
+    servers = newrelic_get_servers(page_id)
+    inactive_servers = [n_id for n_id, status in servers if not status]
+    newrelic_delete_servers(inactive_servers)
