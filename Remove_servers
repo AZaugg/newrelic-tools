@@ -27,12 +27,15 @@ def newrelic_get_servers(page_id, servers=[]):
         print "Did not receive 200 response, retrying page %d" % page_id
         newrelic_get_servers(page_id)
 
-    # If nothing in return object, we are done
-    response = request.json()["servers"]
-    if not response:
-        return servers
+    response = request.json()
 
-    page_id = page_id + 1
+    # If nothing in return object, we are done
+    if "servers" not in response:
+        return []
+
+    response = response["servers"]
+
+    page_id += 1
     for server in response:
         name = server["id"]
         status = server["reporting"]
@@ -51,7 +54,7 @@ def newrelic_delete_servers(servers):
         url = "https://api.newrelic.com/v2/servers/%d.json" % server
         headers = {'X-Api-Key': NEWRELIC_API_KEY}
 
-        request = requests.delete(url, headers=headers)
+        requests.delete(url, headers=headers)
 
 #-------------------------------------------------------------------------------------
 if __name__ == "__main__":
